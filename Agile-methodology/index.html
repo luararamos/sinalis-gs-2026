@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pitch Sinalis – Teleprompter</title>
+<style>
+:root{--bg:#faf7fc;--surface:#fff;--ink:#23182f;--muted:#6a5f78;--line:#e4daee;--accent:#6d2aa8;--accent-ink:#fff;--warn:#b3261e;--hi:#f1e8fa;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171220;--surface:#211a2d;--ink:#f2ecf8;--muted:#aa9fbb;--line:#3a3048;--accent:#c9a2ff;--accent-ink:#25123a;--warn:#ff8a80;--hi:#2a2038}}
+:root[data-theme="dark"]{--bg:#171220;--surface:#211a2d;--ink:#f2ecf8;--muted:#aa9fbb;--line:#3a3048;--accent:#c9a2ff;--accent-ink:#25123a;--warn:#ff8a80;--hi:#2a2038}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.5}
+.wrap{max-width:860px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:1.1rem;margin:0;font-weight:600}
+.sub{color:var(--muted);font-size:.85rem;font-family:system-ui,sans-serif}
+.clock{display:flex;align-items:baseline;gap:16px;margin:14px 0 6px;flex-wrap:wrap}
+#time{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:clamp(3rem,14vw,5.5rem);font-weight:700;letter-spacing:-.02em;line-height:1}
+#time.over{color:var(--warn)}
+#seg{font-family:system-ui,sans-serif;color:var(--muted);font-size:.95rem}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;position:relative}
+#fill{height:100%;width:0;background:var(--accent)}
+.ticks{position:absolute;inset:0;pointer-events:none}
+.ticks i{position:absolute;top:0;bottom:0;width:2px;background:var(--bg)}
+.ctrl{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap;font-family:system-ui,sans-serif;align-items:center}
+button{font:inherit;font-size:.95rem;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;min-width:120px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.opt{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-family:system-ui,sans-serif;font-size:.9rem;color:var(--muted);margin:0 0 14px}
+.opt label{display:flex;gap:6px;align-items:center}
+.opt input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:260px;flex:1}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:14px}
+.stage h2{margin:0 0 4px;font-size:1.05rem}
+.cue{font-family:system-ui,sans-serif;font-size:.85rem;color:var(--accent);margin:0 0 12px;min-height:1.2em}
+#speech{font-size:var(--fs,1.6rem);line-height:1.55;margin:0;max-width:34em}
+.list{display:grid;gap:6px;font-family:system-ui,sans-serif}
+.item{border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.item .row{display:flex;align-items:center;gap:6px;padding:4px}
+.item .jump{flex:1;display:flex;gap:12px;align-items:center;border:0;background:none;text-align:left;padding:8px;border-radius:6px;cursor:pointer}
+.item .tog{font-size:.8rem;padding:6px 10px;white-space:nowrap}
+.item .full{display:none;margin:0;padding:4px 16px 16px;font-size:1.05rem;line-height:1.6;max-width:40em;font-family:Georgia,serif}
+.item.open .full{display:block}
+.item.on{background:var(--hi);border-color:var(--accent)}
+.item.done{opacity:.55}
+.item .t{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;color:var(--muted);min-width:6.5em}
+.item .n{flex:1;font-size:.95rem}
+.item .w{font-size:.8rem;color:var(--muted)}
+.size{margin-left:auto;display:flex;gap:6px;align-items:center}
+#scrub{width:100%;margin:10px 0 0;accent-color:var(--accent);height:28px;cursor:pointer}
+.sd{-webkit-text-stroke:.045em currentColor}
+@media (prefers-reduced-motion:no-preference){#fill{transition:width .2s linear}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>Sinalis: comunicação sem barreiras. Pitch de 3 minutos</h1><div class="sub">Espaço inicia ou pausa. Setas ← → trocam de fala.</div></div>
+</header>
+
+<div class="clock"><div id="time" aria-live="off">0:00</div><div id="seg"></div></div>
+<div class="bar" aria-hidden="true"><div id="fill"></div><div class="ticks" id="ticks"></div></div>
+<input type="range" id="scrub" min="0" max="162" step="1" value="0" aria-label="Linha do tempo: arraste para ir e voltar">
+
+<div class="ctrl">
+  <button class="primary" id="go">Iniciar</button>
+  <button id="reset">Zerar</button>
+  <button id="all" aria-pressed="false">Expandir todas</button>
+  <div class="size"><span class="sub">Letra</span><button id="minus" aria-label="Diminuir letra">A−</button><button id="plus" aria-label="Aumentar letra">A+</button></div>
+</div>
+<div class="opt">
+  <label><input type="checkbox" id="ck"> Incluir trechos expandidos</label>
+  <label style="flex:1">Frase do Angelo <input type="text" id="ang" value="[Uma frase do que ele respondeu.]"></label>
+</div>
+
+<section class="stage">
+  <h2 id="stTitle"></h2>
+  <p class="cue" id="stCue"></p>
+  <p id="speech"></p>
+</section>
+
+<div class="list" id="list"></div>
+</div>
+
+<script>
+const LIMIT=180;
+const BASE=[
+{t:"Gancho",cue:"Tela escura com a pergunta; cena de balcão com duas pessoas sem se entender.",b:"Você já tentou dizer algo importante e não foi compreendido, só porque a outra pessoa não fala a sua língua? Agora imagine isso todos os dias, num balcão, numa consulta, numa entrevista. É a realidade de muitas pessoas surdas.",e:"Não é falta de vontade de nenhum dos lados. É falta de uma ponte."},
+{t:"O problema",cue:"Colagem de situações: consulta, entrevista, fila de atendimento.",b:"A Libras é língua oficial do país, mas a maioria dos ouvintes não a conhece, e intérprete nem sempre está por perto. Por isso, a pessoa surda perde autonomia justamente onde mais importa: na saúde, no trabalho e nos serviços.",e:"A Global pede inovação que chegue a quem realmente precisa."},
+{t:"Fomos a campo",cue:"Fotos da visita à gelateria Il Sordo e das anotações.",b:"Tivemos a ideia, mas não ficamos na teoria: fomos atrás de um caso de uso real, na gelateria Il Sordo. Lá, trocamos conversas em Libras com uma das atendentes, que gostou muito do aplicativo. Ficamos frente a frente com quem usaria o Sinalis.",e:"Foi a diferença entre imaginar o problema e ouvir quem vive com ele."},
+{t:"Conversa com o Angelo",cue:"Foto ou anotação da conversa; depois o diagrama de casos de uso e o backlog com o MVP destacado.",b:"Depois, sentamos com o Angelo, gerente da loja, e fizemos a pergunta que mais importava: qual seria a melhor versão desse aplicativo para atender o seu cliente? {A} Foi dessa conversa que saiu o nosso MVP: captar a voz, mostrar o avatar em Libras, captar os sinais e gerar o áudio.",e:"O que ficou de fora, como histórico e ajuste de velocidade, vira próximas sprints."},
+{t:"A solução",cue:"Logo do Sinalis e demonstração dos dois fluxos: ouvinte para avatar, surda para áudio.",b:"Foi assim que chegamos ao Sinalis: um aplicativo de tradução nos dois sentidos entre Libras e português, com inteligência artificial. Quando o ouvinte fala, o app capta a voz e um avatar animado transforma a fala em Libras na tela. Quando a pessoa surda sinaliza para a câmera, o app reconhece os movimentos e converte em áudio, em português. Só um celular, sem intérprete.",e:"É uma conversa de verdade, nos dois sentidos, em tempo real."},
+{t:"Para quem é",cue:"Cartões da persona Marina e do atendente, lado a lado.",b:"Nossa persona, a Marina, 28 anos, surda, quer independência: em toda consulta e atendimento, precisa de alguém para intermediar. Do outro lado está o atendente, que quer atender bem, mas não sabe sinalizar. Os dois são usuários do Sinalis.",e:"Entendemos as duas dores antes de desenhar qualquer tela."},
+{t:"Como é por dentro",cue:"As três telas, uma por vez, com o dedo tocando o botão.",b:"No protótipo do Sinalis, são três telas: a inicial, com dois botões grandes, Falar e Sinalizar; a do avatar em Libras, com legenda; e a da câmera, que mostra texto e áudio. Alto contraste, poucos botões, uso com uma só mão.",e:"Pensamos em quem não é especialista em tecnologia."},
+{t:"Por que importa",cue:"Ícones dos ODS 10, 9 e 11 com a frase de impacto.",b:"Mais do que tecnologia, falamos de inclusão, autonomia e oportunidades: ser atendida, trabalhar, estudar e participar sem barreira. O Sinalis se conecta aos ODS 10, redução das desigualdades, 9, inovação, e 11, cidades sustentáveis.",e:"Medimos pelo número de conversas traduzidas."},
+{t:"Fechamento e equipe",cue:"Logo e slogan do Sinalis em destaque; depois foto ou nomes da equipe.",b:"Acreditamos que a inclusão começa quando todos têm o direito de se comunicar. Porque ninguém deveria precisar de uma voz igual à nossa para ter o direito de ser ouvido. Nosso objetivo é simples: transformar barreiras em conexões. Sinalis: comunicação sem barreiras. Somos a equipe formada por Luara, Ana Luiza, Matheus e Rafael. Obrigado!",e:"A tecnologia é o meio. A pessoa é o objetivo."}
+];
+const $=id=>document.getElementById(id);
+const fmt=s=>{s=Math.max(0,Math.floor(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+const words=t=>t.trim().split(/\s+/).length;
+let S=[],T=0,el=0,run=false,last=0,cur=-1,fs=1.6,allOpen=false,FW=[],CN=[],SW=[],SC=0;
+const list=$("list");
+
+function make(){
+  const inc=$("ck").checked,ang=$("ang").value.trim()||"...";let a=0;
+  S=BASE.map(g=>{const x=g.b.replace("{A}",ang)+(inc?" "+g.e:"");const d=Math.max(3,Math.round(words(x)/150*60));const o={t:g.t,cue:g.cue,x,s:a,e:a+d};a+=d;return o});
+  T=a;$("scrub").max=T;
+}
+function mk(p,t){p.textContent="";return t.split(/\s+/).map((w,i,a)=>{const s=document.createElement("span");s.textContent=w;p.appendChild(s);if(i<a.length-1)p.appendChild(document.createTextNode(" "));return s})}
+function setOpen(b,o){b.classList.toggle("open",o);const t=b.querySelector(".tog");t.textContent=o?"Recolher":"Ver fala";t.setAttribute("aria-expanded",o)}
+function buildList(){
+  list.textContent="";$("ticks").textContent="";FW=[];CN=S.map(()=>0);
+  S.forEach((g,i)=>{
+    const b=document.createElement("div");b.className="item";
+    const d=g.e-g.s,w=words(g.x);
+    b.innerHTML=`<div class="row"><button type="button" class="jump"><span class="t">${fmt(g.s)} – ${fmt(g.e)}</span><span class="n">${g.t}</span><span class="w">${w} palavras, ${d}s</span></button><button type="button" class="tog" aria-expanded="false">Ver fala</button></div><p class="full"></p>`;
+    FW.push(mk(b.querySelector(".full"),g.x));
+    b.querySelector(".jump").addEventListener("click",()=>{el=g.s;render(true)});
+    b.querySelector(".tog").addEventListener("click",()=>setOpen(b,!b.classList.contains("open")));
+    if(allOpen)setOpen(b,true);
+    list.appendChild(b);
+    if(i>0){const k=document.createElement("i");k.style.left=(g.s/T*100)+"%";$("ticks").appendChild(k)}
+  });
+}
+function setRange(a,from,to){if(to>from)for(let k=from;k<to;k++)a[k].classList.add("sd");else for(let k=to;k<from;k++)a[k].classList.remove("sd")}
+function paint(){
+  const i=cur,g=S[i],p=Math.min(1,Math.max(0,(el-g.s)/(g.e-g.s)));
+  const n=Math.round(p*SW.length);
+  if(n!==SC){setRange(SW,SC,n);SC=n}
+  FW.forEach((a,j)=>{const t=j<i?a.length:j===i?Math.round(p*a.length):0;if(t!==CN[j]){setRange(a,CN[j],t);CN[j]=t}});
+}
+function segAt(t){for(let i=0;i<S.length;i++)if(t<S[i].e)return i;return S.length-1}
+function render(force){
+  const i=segAt(el);
+  if(i!==cur||force){
+    cur=i;const g=S[i];
+    $("stTitle").textContent=g.t;$("stCue").textContent=g.cue?"Na tela: "+g.cue:"";
+    SW=mk($("speech"),g.x);SC=0;
+    [...list.children].forEach((c,j)=>{c.classList.toggle("on",j===i);c.classList.toggle("done",j<i)});
+    if(allOpen&&run)list.children[i].scrollIntoView({block:"center"});
+  }
+  const g=S[cur];
+  $("time").textContent=fmt(el)+" / "+fmt(T);
+  $("time").classList.toggle("over",el>LIMIT);
+  $("seg").textContent=(el>LIMIT?"Passou de 3:00. ":T>LIMIT?"Total acima de 3:00. ":"")+"Trecho: "+fmt(Math.max(0,g.e-el))+" restantes";
+  $("fill").style.width=Math.min(100,el/T*100)+"%";
+  paint();$("scrub").value=Math.min(T,el);
+}
+function tick(){
+  if(!run)return;
+  const n=performance.now();el+=(n-last)/1000;last=n;
+  if(el>=T){el=T;run=false;$("go").textContent="Iniciar"}
+  render();
+  if(run)requestAnimationFrame(tick);
+}
+function toggle(){
+  if(!run&&el>=T)el=0;
+  run=!run;$("go").textContent=run?"Pausar":(el>0?"Continuar":"Iniciar");
+  if(run){last=performance.now();requestAnimationFrame(tick)}
+}
+function jump(d){const i=Math.min(S.length-1,Math.max(0,segAt(el)+d));el=S[i].s;render(true)}
+function rebuild(){
+  const i=Math.max(0,cur);make();buildList();el=S[Math.min(i,S.length-1)].s;cur=-1;render(true);
+}
+$("go").addEventListener("click",toggle);
+$("scrub").addEventListener("input",e=>{el=parseFloat(e.target.value);render()});
+$("reset").addEventListener("click",()=>{run=false;el=0;$("go").textContent="Iniciar";render(true)});
+$("all").addEventListener("click",()=>{allOpen=!allOpen;[...list.children].forEach(c=>setOpen(c,allOpen));$("all").textContent=allOpen?"Recolher todas":"Expandir todas";$("all").setAttribute("aria-pressed",allOpen)});
+$("plus").addEventListener("click",()=>{fs=Math.min(3,fs+.2);document.documentElement.style.setProperty("--fs",fs+"rem")});
+$("minus").addEventListener("click",()=>{fs=Math.max(1,fs-.2);document.documentElement.style.setProperty("--fs",fs+"rem")});
+$("ck").addEventListener("change",rebuild);
+$("ang").addEventListener("change",rebuild);
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"&&e.target.type!=="range")return;
+  if(e.target.tagName==="BUTTON"&&e.code==="Space")return;
+  if(e.target.id==="scrub"&&e.key.startsWith("Arrow"))return;
+  if(e.code==="Space"){e.preventDefault();toggle()}
+  if(e.key==="ArrowRight")jump(1);
+  if(e.key==="ArrowLeft")jump(-1);
+});
+make();buildList();render(true);
+</script>
+</body>
+</html>
